@@ -4,18 +4,19 @@ from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
 import urllib.parse
 
-# 1. הגדרות דף ועיצוב CSS חסין ל-RTL
+# 1. הגדרות דף ועיצוב CSS קשיח ל-RTL
 st.set_page_config(page_title="WikiNews Israel", layout="wide")
 
+# הזרקת CSS שקובע יישור לימין לכל האפליקציה בצורה אגרסיבית
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap');
     
-    /* הגדרות כלליות ליישור ימין */
-    html, body, [class*="css"], .stApp {
-        font-family: 'Assistant', sans-serif;
-        direction: rtl;
-        text-align: right;
+    /* הגדרת כיוון גלובלית */
+    html, body, [data-testid="stAppViewContainer"], .main {
+        direction: rtl !important;
+        text-align: right !important;
+        font-family: 'Assistant', sans-serif !important;
     }
     
     .main-title {
@@ -25,69 +26,38 @@ st.markdown("""
         text-align: center;
         border-bottom: 4px solid #ee3124;
         padding-bottom: 10px;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
 
     .news-card {
         background-color: #ffffff;
         border-right: 8px solid #ee3124;
-        padding: 25px;
-        margin-bottom: 30px;
+        padding: 20px;
+        margin-bottom: 25px;
         border-radius: 4px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         direction: rtl;
     }
-    
-    .wiki-rank-tag {
-        font-size: 0.9rem;
-        color: #666;
+
+    .source-tag {
+        background-color: #ee3124;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
         font-weight: bold;
-    }
-
-    .wiki-header {
-        color: #0056b3;
-        font-size: 2rem;
-        text-decoration: none;
-        margin-bottom: 5px;
-        display: block;
-    }
-
-    .news-section {
-        margin-top: 20px;
-        background-color: #f9f9f9;
-        padding: 15px;
-        border-radius: 8px;
+        margin-left: 8px;
+        display: inline-block;
     }
 
     .news-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #eee;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #f0f0f0;
     }
 
-    .source-label {
-        background-color: #ee3124;
-        color: white;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: bold;
-        margin-left: 12px;
-        white-space: nowrap;
-    }
-
-    .news-text {
-        color: #222;
-        text-decoration: none;
-        font-size: 1.05rem;
-        line-height: 1.4;
-    }
-
-    .news-text:hover {
-        color: #ee3124;
-        text-decoration: underline;
+    a {
+        text-decoration: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -98,7 +68,7 @@ def get_wiki_top_views():
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y/%m/%d')
     url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{yesterday}"
     try:
-        r = requests.get(url, headers={'User-Agent': 'WikiNewsApp/1.0'}, timeout=10)
+        r = requests.get(url, headers={'User-Agent': 'WikiNewsApp/1.1'}, timeout=10)
         articles = r.json()['items'][0]['articles']
         exclude = ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:", "קובץ:", "משתמש:", "עזרה:", "קטגוריה:", "תבנית:"]
         # שליפת 20 ערכים
@@ -128,44 +98,41 @@ def get_news(query):
     except:
         return []
 
-# 3. תצוגה
+# 3. תצוגת האתר
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
-st.write("<center>הנושאים הכי חמים בישראל אתמול והקשרם החדשותי</center>", unsafe_allow_html=True)
+st.markdown('<p style="text-align: center;">הנושאים הכי חמים בישראל אתמול והקשרם החדשותי</p>', unsafe_allow_html=True)
 
-with st.spinner('מעדכן נתונים...'):
-    data = get_wiki_top_views()
+data = get_wiki_top_views()
 
 if not data:
-    st.error("לא הצלחנו לשלוף נתונים. נסה שנית.")
+    st.error("לא ניתן לטעון נתונים כרגע.")
 else:
     for i, item in enumerate(data):
         article_name = item['article'].replace('_', ' ')
-        views = item['views']
         news_list = get_news(article_name)
         
-        # בניית הכרטיס המעוצב
-        card_html = f"""
-        <div class="news-card">
-            <div class="wiki-rank-tag">מקום {i+1} במדד הפופולריות</div>
-            <a class="wiki-header" href="https://he.wikipedia.org/wiki/{item['article']}" target="_blank">{article_name}</a>
-            <div style="color: #999; font-size: 0.85rem;">{views:,} צפיות אתמול</div>
-            
-            <div class="news-section">
-                <p style="margin-top:0; font-weight: bold; color: #444;">חדשות אחרונות:</p>
-        """
-        
+        # בניית ה-HTML של הכתבות
+        news_html = ""
         if news_list:
             for n in news_list:
-                card_html += f"""
+                news_html += f"""
                 <div class="news-item">
-                    <span class="source-label">{n['source']}</span>
-                    <a class="news-text" href="{n['link']}" target="_blank">{n['title']}</a>
+                    <span class="source-tag">{n['source']}</span>
+                    <a href="{n['link']}" target="_blank" style="color: #333;">{n['title']}</a>
                 </div>
                 """
         else:
-            card_html += "<p style='color:#999;'>לא נמצאו כתבות ישירות מהיממה האחרונה.</p>"
-            
-        card_html += "</div></div>"
-        st.markdown(card_html, unsafe_allow_html=True)
+            news_html = "<p style='color: #999;'>לא נמצאו ידיעות חדשותיות ישירות.</p>"
 
-st.markdown("<br><center style='color:#ccc;'>הנתונים מבוססים על Wikimedia API ו-Google News</center>", unsafe_allow_html=True)
+        # הצגת כרטיס הערך
+        st.markdown(f"""
+        <div class="news-card">
+            <div style="font-size: 0.8rem; color: #666;">מקום {i+1} במדד הפופולריות</div>
+            <h2 style="margin: 5px 0;"><a href="https://he.wikipedia.org/wiki/{item['article']}" target="_blank" style="color: #0056b3;">{article_name}</a></h2>
+            <div style="font-size: 0.8rem; color: #999; margin-bottom: 15px;">{item['views']:,} צפיות אתמול</div>
+            <div style="font-weight: bold; margin-bottom: 10px; border-top: 1px solid #eee; padding-top: 10px;">למה זה בחדשות?</div>
+            {news_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown("<hr><center style='color: #999; font-size: 0.8rem;'>מקורות: Wikimedia API & Google News RSS</center>", unsafe_allow_html=True)
