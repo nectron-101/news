@@ -7,12 +7,13 @@ import urllib.parse
 # 1. הגדרות דף
 st.set_page_config(page_title="WikiNews Israel", layout="wide")
 
-# CSS - יישור לימין ועיצוב כרטיסים
+# CSS - יישור לימין חזק ועיצוב כרטיסים
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap');
     
-    html, body, [data-testid="stAppViewContainer"], .main {
+    /* הגדרה גלובלית כולל ה-containers הפנימיים של streamlit */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stVerticalBlock"], [data-testid="stMarkdownContainer"] {
         direction: rtl !important;
         text-align: right !important;
         font-family: 'Assistant', sans-serif !important;
@@ -22,10 +23,16 @@ st.markdown("""
         color: #ee3124;
         font-size: 3rem;
         font-weight: 800;
-        text-align: center;
+        text-align: center !important;
         border-bottom: 4px solid #ee3124;
         padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+
+    .sub-header {
+        text-align: center !important;
         margin-bottom: 25px;
+        color: #555;
     }
 
     .news-card {
@@ -35,7 +42,7 @@ st.markdown("""
         margin-bottom: 25px;
         border-radius: 4px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        direction: rtl;
+        direction: rtl !important;
     }
 
     .source-tag {
@@ -61,6 +68,7 @@ st.markdown("""
         padding-bottom: 6px;
         border-bottom: 1px solid #f0f0f0;
         line-height: 1.5;
+        text-align: right !important;
     }
 
     a {
@@ -109,7 +117,7 @@ def get_news(query):
 
 # כותרת
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
-st.write("<center>הנושאים הכי חמים בישראל אתמול והקשרם החדשותי</center>", unsafe_allow_html=True)
+st.markdown('<div class="sub-header">הנושאים הכי חמים בישראל אתמול והקשרם החדשותי</div>', unsafe_allow_html=True)
 
 data = get_wiki_top_views()
 
@@ -120,7 +128,6 @@ else:
         name = item['article'].replace('_', ' ')
         news_list = get_news(name)
         
-        # בניית רשימת החדשות - שימוש בגרש בודד למניעת התנגשויות
         news_rows = []
         for n in news_list:
             d_tag = f'<span class="date-tag">{n["date"]}</span>' if n["date"] else ""
@@ -129,7 +136,6 @@ else:
         
         all_news_html = "".join(news_rows) if news_rows else "לא נמצאו ידיעות רלוונטיות."
 
-        # כרטיס סופי
         card = f"""
         <div class="news-card">
             <div style="font-size: 0.8rem; color: #666;">מקום {i+1}</div>
