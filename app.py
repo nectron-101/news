@@ -25,10 +25,19 @@ st.markdown("""
         text-align: center !important;
         border-bottom: 4px solid #ee3124;
         padding-bottom: 10px;
-        margin-bottom: 25px;
+        margin-bottom: 10px;
     }
 
-    /* עיצוב כרטיס אייטם פתוח (במקום אקורדיון) */
+    .data-status {
+        text-align: center !important;
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 25px;
+        font-weight: bold;
+        color: #333;
+    }
+
     .wiki-card {
         background-color: #ffffff;
         border-right: 10px solid #ee3124;
@@ -81,20 +90,23 @@ st.markdown("""
 
 @st.cache_data(ttl=3600)
 def fetch_top_articles():
+    # המערכת בודקת אתמול, ואז שלשום במקרה של חוסר בנתונים
     for days_back in [1, 2]:
-        target_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y/%m/%d')
-        url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{target_date}"
+        dt = datetime.now() - timedelta(days=days_back)
+        date_str = dt.strftime('%Y/%m/%d')
+        display_date = dt.strftime('%d/%m/%Y')
+        url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{date_str}"
         try:
             r = requests.get(url, headers={'User-Agent': 'WikiNews/2.2'}, timeout=10)
             if r.status_code == 200:
                 articles = r.json()['items'][0]['articles']
                 exclude = ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:", "קובץ:", "משתמש:", "עזרה:", "קטגוריה:", "תבנית:"]
-                return [a for a in articles if not any(word in a['article'] for word in exclude)][:20]
+                filtered = [a for a in articles if not any(word in a['article'] for word in exclude)][:20]
+                return filtered, display_date
         except: continue
-    return []
+    return [], None
 
 def get_wiki_meta(title):
-    # שליפת תמונה רשמית מוויקיפדיה
     encoded_title = urllib.parse.quote(title)
     url = f"https://he.wikipedia.org/w/api.php?action=query&titles={encoded_title}&prop=pageimages|info&format=json&pithumbsize=600"
     try:
@@ -115,7 +127,6 @@ def get_google_news(query):
         r = requests.get(url, timeout=5)
         root = ET.fromstring(r.content)
         news = []
-        # שינוי האינדקס ל-4 כאן:
         for item in root.findall('.//item')[:4]:
             t = item.find('title').text
             pub_date = item.find('pubDate').text
@@ -133,9 +144,13 @@ def get_google_news(query):
         
 # תצוגה ראשית
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #555;">הנושאים הכי חמים בישראל והקשרם החדשותי</p>', unsafe_allow_html=True)
 
-top_list = fetch_top_articles()
+top_list, data_date = fetch_top_articles()
+
+if data_date:
+    st.markdown(f'<div class="data-status">נכון לנתוני הצפיות של יום: {data_date}</div>', unsafe_allow_html=True)
+else:
+    st.markdown('<p style="text-align: center; color: #555;">הנושאים הכי חמים בישראל והקשרם החדשותי</p>', unsafe_allow_html=True)
 
 if not top_list:
     st.error("לא ניתן לטעון נתונים. נסה לרענן.")
@@ -145,9 +160,7 @@ else:
         meta = get_wiki_meta(art['article'])
         news = get_google_news(title_clean)
         
-        # יצירת מכולה לכרטיס פתוח
         st.markdown(f'<div class="wiki-card">', unsafe_allow_html=True)
-        
         col_img, col_text = st.columns([1, 2.5])
         
         with col_img:
@@ -162,7 +175,7 @@ else:
         with col_text:
             st.markdown(f'<div class="rank-label" style="color:#ee3124; font-weight:bold;">מקום {i+1} במדד הפופולריות</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="item-title">{title_clean}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="views-info">👁️ {art["views"]:,} צפיות אתמול</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="views-info">👁️ {art["views"]:,} צפיות</div>', unsafe_allow_html=True)
             
             st.write("**למה זה בחדשות?**")
             if news:
