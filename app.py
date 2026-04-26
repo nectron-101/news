@@ -115,7 +115,8 @@ def get_google_news(query):
         r = requests.get(url, timeout=5)
         root = ET.fromstring(r.content)
         news = []
-        for item in root.findall('.//item')[:6]:
+        # שינוי האינדקס ל-4 כאן:
+        for item in root.findall('.//item')[:4]:
             t = item.find('title').text
             pub_date = item.find('pubDate').text
             try:
@@ -129,7 +130,7 @@ def get_google_news(query):
             })
         return news
     except: return []
-
+        
 # תצוגה ראשית
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
 st.markdown('<p style="text-align: center; color: #555;">הנושאים הכי חמים בישראל והקשרם החדשותי</p>', unsafe_allow_html=True)
