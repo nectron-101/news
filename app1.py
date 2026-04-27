@@ -5,18 +5,18 @@ import xml.etree.ElementTree as ET
 import urllib.parse
 
 # 1. הגדרות דף
-st.set_page_config(page_title="Google Trends Israel", layout="wide", page_icon="🔥")
+st.set_page_config(page_title='Google Trends Israel', layout='wide', page_icon='🔥')
 
-# CSS יוקרתי - יישור לימין (RTL) וסינכרון שורות מושלם
+# CSS יוקרתי - יישור לימין (RTL) כפוי על כל המכולות של Streamlit
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;800&display=swap');
     
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stVerticalBlock"], .stMarkdown {
+    /* יישור גלובלי אגרסיבי */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stVerticalBlock"], [data-testid="stMarkdownContainer"] {
         direction: rtl !important;
         text-align: right !important;
         font-family: 'Assistant', sans-serif !important;
-        background-color: #f8f9fa;
     }
     
     .main-title {
@@ -43,11 +43,12 @@ st.markdown("""
 
     .trend-card {
         background-color: #ffffff;
-        border-right: 10px solid #4285F4;
+        border-right: 12px solid #4285F4;
         padding: 30px;
         margin-bottom: 35px;
         border-radius: 15px;
         box-shadow: 0 5px 25px rgba(0,0,0,0.05);
+        direction: rtl;
     }
     
     .item-link {
@@ -57,6 +58,7 @@ st.markdown("""
         text-decoration: none !important;
         display: block;
         margin-bottom: 5px;
+        text-align: right;
     }
     
     .item-link:hover { color: #4285F4 !important; }
@@ -75,17 +77,16 @@ st.markdown("""
     .section-label {
         font-weight: 800;
         color: #444;
-        font-size: 1rem;
+        font-size: 1.1rem;
         margin-bottom: 15px;
         display: block;
         border-bottom: 2px solid #f1f3f4;
         padding-bottom: 5px;
     }
 
-    /* סינכרון שורת החדשות - יישור ימין מושלם */
+    /* עיצוב שורת החדשות */
     .news-item {
         display: flex;
-        flex-direction: row;
         align-items: center;
         gap: 15px;
         padding: 12px 15px;
@@ -94,6 +95,7 @@ st.markdown("""
         border: 1px solid #f0f0f0;
         margin-bottom: 10px;
         transition: background 0.2s;
+        direction: rtl;
     }
 
     .news-item:hover { background-color: #f8fbff; }
@@ -105,7 +107,7 @@ st.markdown("""
         border-radius: 6px;
         font-size: 0.75rem;
         font-weight: 800;
-        min-width: 80px;
+        min-width: 90px;
         text-align: center;
     }
 
@@ -113,7 +115,7 @@ st.markdown("""
         color: #999;
         font-size: 0.8rem;
         min-width: 50px;
-        text-align: right;
+        text-align: center;
     }
 
     .news-link {
@@ -131,7 +133,7 @@ st.markdown("""
 
 @st.cache_data(ttl=1800)
 def fetch_google_trends():
-    url = "https://trends.google.com/trending/rss?geo=IL"
+    url = 'https://trends.google.com/trending/rss?geo=IL'
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
@@ -140,14 +142,14 @@ def fetch_google_trends():
         trends = []
         for item in root.findall('.//item'):
             title = item.find('title').text
-            traffic = item.find('ht:approx_traffic', ns).text if item.find('ht:approx_traffic', ns) is not None else ""
-            trends.append({"title": title, "traffic": traffic})
+            traffic = item.find('ht:approx_traffic', ns).text if item.find('ht:approx_traffic', ns) is not None else ''
+            trends.append({'title': title, 'traffic': traffic})
         return trends[:20]
     except: return []
 
 def get_google_news(query):
     encoded = urllib.parse.quote(query)
-    url = f"https://news.google.com/rss/search?q={encoded}&hl=he&gl=IL&ceid=IL:he"
+    url = f'https://news.google.com/rss/search?q={encoded}&hl=he&gl=IL&ceid=IL:he'
     try:
         r = requests.get(url, timeout=5)
         root = ET.fromstring(r.content)
@@ -157,12 +159,12 @@ def get_google_news(query):
             pub_date = item.find('pubDate').text
             try:
                 date_str = datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %Z').strftime('%d/%m')
-            except: date_str = ""
+            except: date_str = ''
             news.append({
-                "title": full_title.split(" - ")[0] if " - " in full_title else full_title,
-                "source": item.find('source').text if item.find('source') is not None else "חדשות",
-                "link": item.find('link').text,
-                "date": date_str
+                'title': full_title.split(' - ')[0] if ' - ' in full_title else full_title,
+                'source': item.find('source').text if item.find('source') is not None else 'חדשות',
+                'link': item.find('link').text,
+                'date': date_str
             })
         return news
     except: return []
@@ -180,27 +182,26 @@ if trends_list:
         search_query = trend['title']
         news = get_google_news(search_query)
         
-        # בניית רשימת החדשות מראש כדי למנוע שגיאות HTML
-        news_html_blocks = []
+        # בנייה נקייה של חלקי ה-HTML
+        news_html = ''
         for n in news:
-            news_html_blocks.append(f"""
-                <div class="news-item">
-                    <span class="source-tag">{n['source']}</span>
-                    <span class="date-tag">{n['date']}</span>
-                    <a href="{n['link']}" target="_blank" class="news-link">{n['title']}</a>
+            news_html += f"""
+                <div class='news-item'>
+                    <span class='source-tag'>{n['source']}</span>
+                    <span class='date-tag'>{n['date']}</span>
+                    <a href='{n['link']}' target='_blank' class='news-link'>{n['title']}</a>
                 </div>
-            """)
-        all_news_html = "".join(news_html_blocks) if news_html_blocks else "לא נמצאו ידיעות רלוונטיות."
+            """
 
-        # כרטיס סופי - ללא שגיאות גרשיים
+        # כרטיס סופי - שימוש בגרש בודד למאפייני HTML
         st.markdown(f"""
-        <div class="trend-card">
-            <div style="color:#4285F4; font-weight:800; font-size: 0.9rem; margin-bottom:5px;">#{i+1} במגמות החיפוש</div>
-            <a href="https://www.google.com/search?q={urllib.parse.quote(search_query)}" target="_blank" class="item-link">{search_query}</a>
-            <div class="traffic-info">🔥 {trend['traffic']} חיפושים</div>
-            <span class="section-label">למה כולם מחפשים את זה?</span>
-            {all_news_html}
+        <div class='trend-card'>
+            <div style='color:#4285F4; font-weight:800; font-size: 0.9rem; margin-bottom:5px;'>#{i+1} במגמות החיפוש</div>
+            <a href='https://www.google.com/search?q={urllib.parse.quote(search_query)}' target='_blank' class='item-link'>{search_query}</a>
+            <div class='traffic-info'>🔥 {trend['traffic']} חיפושים</div>
+            <span class='section-label'>למה כולם מחפשים את זה?</span>
+            {news_html}
         </div>
         """, unsafe_allow_html=True)
 else:
-    st.error("לא ניתן לטעון את המגמות. נסה לרענן.")
+    st.error('לא ניתן לטעון את המגמות. נסה לרענן.')
