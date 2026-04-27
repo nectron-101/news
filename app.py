@@ -7,7 +7,7 @@ import urllib.parse
 # 1. הגדרות דף
 st.set_page_config(page_title="WikiNews Pro Israel", layout="wide", page_icon="🇮🇱")
 
-# CSS חזק ליישור ימין (RTL) ועיצוב כרטיסים פתוחים
+# CSS חזק ליישור ימין (RTL), עיצוב כרטיסים ופס מגמות
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap');
@@ -23,19 +23,39 @@ st.markdown("""
         font-size: 3rem;
         font-weight: 800;
         text-align: center !important;
-        border-bottom: 4px solid #ee3124;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
 
     .data-status {
         text-align: center !important;
         background-color: #f0f2f6;
-        padding: 10px;
+        padding: 8px;
         border-radius: 5px;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
         font-weight: bold;
-        color: #333;
+        color: #555;
+        font-size: 0.85rem;
+    }
+
+    /* עיצוב פס מגמות גוגל */
+    .trends-bar {
+        background-color: #ffffff;
+        border: 1px solid #ddd;
+        border-right: 10px solid #4285F4;
+        padding: 15px;
+        margin-bottom: 30px;
+        border-radius: 8px;
+    }
+
+    .trend-tag {
+        display: inline-block;
+        background-color: #e8f0fe;
+        color: #1967d2;
+        padding: 5px 12px;
+        border-radius: 20px;
+        margin: 5px;
+        font-weight: bold;
+        font-size: 0.95rem;
     }
 
     .wiki-card {
@@ -88,9 +108,22 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+@st.cache_data(ttl=1800) # ריענון מגמות כל חצי שעה
+def get_google_trends():
+    url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=IL"
+    try:
+        r = requests.get(url, timeout=10)
+        root = ET.fromstring(r.content)
+        trends = []
+        for item in root.findall('.//item')[:6]:
+            trends.append(item.find('title').text)
+        return trends
+    except:
+        return []
+
 @st.cache_data(ttl=3600)
 def fetch_top_articles():
-    # המערכת בודקת אתמול, ואז שלשום במקרה של חוסר בנתונים
+    update_time = datetime.now().strftime('%H:%M')
     for days_back in [1, 2]:
         dt = datetime.now() - timedelta(days=days_back)
         date_str = dt.strftime('%Y/%m/%d')
@@ -102,9 +135,9 @@ def fetch_top_articles():
                 articles = r.json()['items'][0]['articles']
                 exclude = ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:", "קובץ:", "משתמש:", "עזרה:", "קטגוריה:", "תבנית:"]
                 filtered = [a for a in articles if not any(word in a['article'] for word in exclude)][:20]
-                return filtered, display_date
+                return filtered, display_date, update_time
         except: continue
-    return [], None
+    return [], None, update_time
 
 def get_wiki_meta(title):
     encoded_title = urllib.parse.quote(title)
@@ -114,10 +147,7 @@ def get_wiki_meta(title):
         pages = data.get('query', {}).get('pages', {})
         page = list(pages.values())[0]
         img_url = page.get('thumbnail', {}).get('source', "")
-        return {
-            "image": img_url,
-            "read_time": max(1, round(page.get('length', 0) / 1500))
-        }
+        return {"image": img_url, "read_time": max(1, round(page.get('length', 0) / 1500))}
     except: return {"image": "", "read_time": 1}
 
 def get_google_news(query):
@@ -142,18 +172,25 @@ def get_google_news(query):
         return news
     except: return []
         
-# תצוגה ראשית
+# --- תצוגה ---
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
 
-top_list, data_date = fetch_top_articles()
+top_list, data_date, last_update = fetch_top_articles()
+trends = get_google_trends()
 
+# 1. הצגת מגמות גוגל בראש הדף
+if trends:
+    st.markdown('<div class="trends-bar"><strong>🔥 עכשיו בגוגל ישראל:</strong><br>', unsafe_allow_html=True)
+    trend_html = "".join([f'<span class="trend-tag">{t}</span>' for t in trends])
+    st.markdown(f'<div>{trend_html}</div></div>', unsafe_allow_html=True)
+
+# 2. חיווי סטטוס
 if data_date:
-    st.markdown(f'<div class="data-status">נכון לנתוני הצפיות של יום: {data_date}</div>', unsafe_allow_html=True)
-else:
-    st.markdown('<p style="text-align: center; color: #555;">הנושאים הכי חמים בישראל והקשרם החדשותי</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="data-status">נתוני ויקיפדיה מיום: {data_date} | עדכון אחרון: {last_update}</div>', unsafe_allow_html=True)
 
+# 3. רשימת הכתבות
 if not top_list:
-    st.error("לא ניתן לטעון נתונים. נסה לרענן.")
+    st.error("לא ניתן לטעון נתונים.")
 else:
     for i, art in enumerate(top_list):
         title_clean = art['article'].replace('_', ' ')
@@ -168,7 +205,6 @@ else:
                 st.image(meta['image'], use_container_width=True)
             else:
                 st.info("אין תמונה בערך")
-            
             st.write(f"⏱️ כ-{meta['read_time']} דק' קריאה")
             st.markdown(f"[🔗 לערך המלא](https://he.wikipedia.org/wiki/{art['article']})")
         
@@ -189,5 +225,4 @@ else:
                     """, unsafe_allow_html=True)
             else:
                 st.write("לא נמצאו ידיעות חדשותיות רלוונטיות כרגע.")
-        
         st.markdown('</div>', unsafe_allow_html=True)
