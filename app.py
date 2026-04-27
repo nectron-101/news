@@ -5,143 +5,99 @@ import xml.etree.ElementTree as ET
 import urllib.parse
 
 # 1. הגדרות דף
-st.set_page_config(page_title="WikiNews Israel", layout="wide", page_icon="🗞️")
+st.set_page_config(page_title="WikiNews Pro Israel", layout="wide", page_icon="🇮🇱")
 
-# CSS מתקדם - ללא תמונות, יישור שורות חדשות מושלם
+# CSS חזק ליישור ימין (RTL) ועיצוב כרטיסים פתוחים
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap');
     
     html, body, [data-testid="stAppViewContainer"], [data-testid="stVerticalBlock"], .stMarkdown {
         direction: rtl !important;
         text-align: right !important;
         font-family: 'Assistant', sans-serif !important;
-        background-color: #f8f9fa;
     }
     
     .main-title {
-        background: linear-gradient(90deg, #ee3124, #b3190f);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 3.5rem;
+        color: #ee3124;
+        font-size: 3rem;
         font-weight: 800;
         text-align: center !important;
-        margin-bottom: 5px;
+        border-bottom: 4px solid #ee3124;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
     }
 
     .data-status {
         text-align: center !important;
-        color: #666;
-        font-size: 0.9rem;
-        margin-bottom: 40px;
-        padding-top: 10px;
-        border-top: 1px solid #eee;
-        width: 60%;
-        margin-left: auto;
-        margin-right: auto;
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 25px;
+        font-weight: bold;
+        color: #333;
     }
 
     .wiki-card {
         background-color: #ffffff;
-        border-right: 8px solid #ee3124;
-        padding: 35px;
-        margin-bottom: 30px;
-        border-radius: 12px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-        transition: transform 0.2s ease;
-    }
-    
-    .wiki-card:hover {
-        transform: scale(1.01);
-    }
-
-    .item-link {
-        color: #1a1a1a !important;
-        font-size: 2.5rem;
-        font-weight: 800;
-        text-decoration: none !important;
-        display: block;
-        margin-bottom: 8px;
-    }
-    
-    .item-link:hover {
-        color: #ee3124 !important;
-    }
-
-    .views-info {
-        background: #f1f3f5;
-        color: #495057;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        display: inline-block;
-        margin-bottom: 25px;
-    }
-
-    .section-label {
-        font-weight: 800;
-        color: #1a1a1a;
-        font-size: 1rem;
-        margin-bottom: 20px;
-        display: block;
-        border-bottom: 2px solid #f8f9fa;
-        padding-bottom: 5px;
-    }
-
-    /* סינכרון שורת החדשות */
-    .news-item {
-        display: flex;
-        align-items: center; /* יישור אנכי למרכז */
-        gap: 15px; /* מרווח קבוע בין אלמנטים */
-        padding: 15px;
-        background-color: #ffffff;
+        border-right: 10px solid #ee3124;
+        padding: 25px;
+        margin-bottom: 40px;
         border-radius: 8px;
-        border: 1px solid #f1f1f1;
-        margin-bottom: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .news-item {
+        margin-bottom: 12px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        border-right: 4px solid #ee3124;
     }
 
     .source-tag {
         background-color: #ee3124;
         color: white;
-        padding: 4px 10px;
-        border-radius: 5px;
-        font-size: 0.8rem;
-        font-weight: 800;
-        min-width: 60px;
-        text-align: center;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 10px;
+        display: inline-block;
     }
 
     .date-tag {
-        color: #999;
-        font-size: 0.85rem;
-        font-weight: 400;
-        min-width: 45px;
+        color: #888;
+        font-size: 0.75rem;
+        margin-left: 10px;
     }
 
-    .news-link {
-        color: #333 !important;
-        font-weight: 600;
-        text-decoration: none !important;
-        font-size: 1.1rem;
-        flex-grow: 1; /* לוקח את שאר המקום */
+    .item-title {
+        color: #0056b3;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-decoration: none;
     }
 
-    .news-link:hover {
-        color: #ee3124 !important;
+    .views-info {
+        color: #666;
+        font-size: 1rem;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
 def fetch_top_articles():
+    # המערכת בודקת אתמול, ואז שלשום במקרה של חוסר בנתונים
     for days_back in [1, 2]:
         dt = datetime.now() - timedelta(days=days_back)
         date_str = dt.strftime('%Y/%m/%d')
         display_date = dt.strftime('%d/%m/%Y')
         url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{date_str}"
         try:
-            r = requests.get(url, headers={'User-Agent': 'WikiNews/3.1'}, timeout=10)
+            r = requests.get(url, headers={'User-Agent': 'WikiNews/2.2'}, timeout=10)
             if r.status_code == 200:
                 articles = r.json()['items'][0]['articles']
                 exclude = ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:", "קובץ:", "משתמש:", "עזרה:", "קטגוריה:", "תבנית:"]
@@ -149,6 +105,20 @@ def fetch_top_articles():
                 return filtered, display_date
         except: continue
     return [], None
+
+def get_wiki_meta(title):
+    encoded_title = urllib.parse.quote(title)
+    url = f"https://he.wikipedia.org/w/api.php?action=query&titles={encoded_title}&prop=pageimages|info&format=json&pithumbsize=600"
+    try:
+        data = requests.get(url, timeout=5).json()
+        pages = data.get('query', {}).get('pages', {})
+        page = list(pages.values())[0]
+        img_url = page.get('thumbnail', {}).get('source', "")
+        return {
+            "image": img_url,
+            "read_time": max(1, round(page.get('length', 0) / 1500))
+        }
+    except: return {"image": "", "read_time": 1}
 
 def get_google_news(query):
     encoded = urllib.parse.quote(query.replace('_', ' '))
@@ -172,41 +142,52 @@ def get_google_news(query):
         return news
     except: return []
         
-# תצוגה
+# תצוגה ראשית
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
 
 top_list, data_date = fetch_top_articles()
 
 if data_date:
-    st.markdown(f'<div class="data-status">נכון לנתוני הצפיות של יום {data_date}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="data-status">נכון לנתוני הצפיות של יום: {data_date}</div>', unsafe_allow_html=True)
+else:
+    st.markdown('<p style="text-align: center; color: #555;">הנושאים הכי חמים בישראל והקשרם החדשותי</p>', unsafe_allow_html=True)
 
 if not top_list:
     st.error("לא ניתן לטעון נתונים. נסה לרענן.")
 else:
     for i, art in enumerate(top_list):
         title_clean = art['article'].replace('_', ' ')
-        wiki_url = f"https://he.wikipedia.org/wiki/{art['article']}"
+        meta = get_wiki_meta(art['article'])
         news = get_google_news(title_clean)
         
-        st.markdown(f"""
-        <div class="wiki-card">
-            <div style="color:#ee3124; font-weight:800; font-size: 0.9rem; margin-bottom:5px;">#{i+1} במדד הפופולריות</div>
-            <a href="{wiki_url}" target="_blank" class="item-link">{title_clean}</a>
-            <div class="views-info">📈 {art["views"]:,} צפיות</div>
-            
-            <span class="section-label">למה זה בחדשות?</span>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="wiki-card">', unsafe_allow_html=True)
+        col_img, col_text = st.columns([1, 2.5])
         
-        if news:
-            for n in news:
-                st.markdown(f"""
-                <div class="news-item">
-                    <span class="source-tag">{n['source']}</span>
-                    <span class="date-tag">{n['date']}</span>
-                    <a href="{n['link']}" target="_blank" class="news-link">{n['title']}</a>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.write("לא נמצאו ידיעות רלוונטיות כרגע.")
+        with col_img:
+            if meta['image']:
+                st.image(meta['image'], use_container_width=True)
+            else:
+                st.info("אין תמונה בערך")
+            
+            st.write(f"⏱️ כ-{meta['read_time']} דק' קריאה")
+            st.markdown(f"[🔗 לערך המלא](https://he.wikipedia.org/wiki/{art['article']})")
+        
+        with col_text:
+            st.markdown(f'<div class="rank-label" style="color:#ee3124; font-weight:bold;">מקום {i+1} במדד הפופולריות</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="item-title">{title_clean}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="views-info">👁️ {art["views"]:,} צפיות</div>', unsafe_allow_html=True)
+            
+            st.write("**למה זה בחדשות?**")
+            if news:
+                for n in news:
+                    st.markdown(f"""
+                    <div class="news-item">
+                        <span class="source-tag">{n['source']}</span>
+                        <span class="date-tag">{n['date']}</span>
+                        <a href="{n['link']}" target="_blank" style="color: #222; font-weight: 500; text-decoration:none;">{n['title']}</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.write("לא נמצאו ידיעות חדשותיות רלוונטיות כרגע.")
         
         st.markdown('</div>', unsafe_allow_html=True)
