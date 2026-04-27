@@ -7,11 +7,12 @@ import urllib.parse
 # 1. הגדרות דף
 st.set_page_config(page_title="Google Trends Israel", layout="wide", page_icon="🔥")
 
-# CSS "סקסי" - RTL מלא, כותרות לחיצות ועיצוב נקי ללא אקורדיון
+# CSS "סקסי" ויוקרתי - RTL מלא, כותרות לחיצות ועיצוב נקי
 st.markdown("""
-    <style>
+<style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;800&display=swap');
     
+    /* יישור גלובלי אגרסיבי */
     html, body, [data-testid="stAppViewContainer"], [data-testid="stVerticalBlock"], [data-testid="stMarkdownContainer"] {
         direction: rtl !important;
         text-align: right !important;
@@ -33,11 +34,11 @@ st.markdown("""
         text-align: center !important;
         background-color: #ffffff;
         padding: 10px;
-        border-radius: 8px;
+        border-radius: 12px;
         margin-bottom: 30px;
         font-weight: bold;
         color: #555;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         width: fit-content;
         margin-left: auto;
         margin-right: auto;
@@ -46,39 +47,47 @@ st.markdown("""
 
     .trend-card {
         background-color: #ffffff;
-        border-right: 10px solid #4285F4;
+        border-right: 12px solid #4285F4;
         padding: 30px;
         margin-bottom: 35px;
-        border-radius: 12px;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        transition: transform 0.2s ease;
+    }
+
+    .trend-card:hover {
+        transform: translateY(-5px);
     }
     
     .item-title-link {
-        color: #0056b3 !important;
-        font-size: 2.5rem;
+        color: #1a1a1a !important;
+        font-size: 2.8rem;
         font-weight: 800;
         text-decoration: none !important;
         transition: color 0.2s;
+        line-height: 1.2;
     }
     
     .item-title-link:hover {
-        color: #ee3124 !important;
+        color: #4285F4 !important;
     }
 
     .traffic-badge {
-        background: #e8f0fe;
+        background: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
         color: #1967d2;
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: 600;
+        padding: 6px 18px;
+        border-radius: 25px;
+        font-size: 0.95rem;
+        font-weight: 700;
         display: inline-block;
-        margin-bottom: 20px;
+        margin-top: 15px;
+        margin-bottom: 25px;
+        border: 1px solid #c6dafc;
     }
 
     .news-box {
-        margin-top: 20px;
-        border-top: 1px solid #eee;
+        margin-top: 10px;
+        border-top: 2px solid #f8f9fa;
         padding-top: 20px;
     }
 
@@ -86,53 +95,57 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 15px;
-        padding: 12px;
-        background-color: #fcfcfc;
-        border-radius: 8px;
+        padding: 15px;
+        background-color: #ffffff;
+        border-radius: 12px;
         border: 1px solid #f1f1f1;
-        margin-bottom: 10px;
-        transition: background 0.2s;
+        margin-bottom: 12px;
+        transition: all 0.2s;
     }
 
     .news-item:hover {
         background-color: #f8fbff;
+        border-color: #d2e3fc;
+        transform: scale(1.01);
     }
 
     .source-tag {
         background-color: #4285F4;
         color: white;
-        padding: 3px 10px;
-        border-radius: 5px;
+        padding: 4px 12px;
+        border-radius: 8px;
         font-size: 0.75rem;
         font-weight: 800;
-        min-width: 80px;
+        min-width: 85px;
         text-align: center;
+        box-shadow: 0 2px 4px rgba(66, 133, 244, 0.2);
     }
 
     .date-tag {
         color: #999;
-        font-size: 0.8rem;
-        min-width: 50px;
+        font-size: 0.85rem;
+        min-width: 55px;
+        font-weight: 400;
     }
 
     .news-link {
         color: #333 !important;
         font-weight: 600;
         text-decoration: none !important;
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         flex-grow: 1;
     }
 
     .news-link:hover {
         color: #4285F4 !important;
     }
-    </style>
-    """, unsafe_allow_html=True)
+</style>
+""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=1800)
 def fetch_trends():
     url = "https://trends.google.com/trending/rss?geo=IL"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
         root = ET.fromstring(r.content)
@@ -181,31 +194,26 @@ if trends_list:
         news = get_news(search_query)
         google_search_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}"
         
-        # בניית רשימת החדשות ב-HTML נקי
+        # בניית רשימת החדשות ב-HTML נקי ללא הזחות
         news_html = ""
         for n in news:
-            news_html += f"""
-            <div class='news-item'>
-                <span class='source-tag'>{n['source']}</span>
-                <span class='date-tag'>{n['date']}</span>
-                <a href='{n['link']}' target='_blank' class='news-link'>{n['title']}</a>
-            </div>
-            """
+            news_html += f"<div class='news-item'><span class='source-tag'>{n['source']}</span><span class='date-tag'>{n['date']}</span><a href='{n['link']}' target='_blank' class='news-link'>{n['title']}</a></div>"
         
         if not news_html:
             news_html = "<p style='color:#999;'>לא נמצאו ידיעות רלוונטיות כרגע.</p>"
 
-        # רינדור הכרטיס (הכל ב-Markdown אחד כדי למנוע "שבירה" של ה-HTML)
-        st.markdown(f"""
-        <div class='trend-card'>
-            <div style='color:#4285F4; font-weight:800; font-size: 0.9rem; margin-bottom:5px;'>#{i+1} במגמות החיפוש</div>
-            <a href='{google_search_url}' target='_blank' class='item-title-link'>{search_query}</a>
-            <div style='margin-top:10px;'><span class='traffic-badge'>🔥 {trend['traffic']} חיפושים</span></div>
-            <div class='news-box'>
-                <div style='font-weight:800; color:#444; margin-bottom:15px; font-size:1.1rem;'>למה כולם מחפשים את זה?</div>
-                {news_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # רינדור הכרטיס - חשוב: המחרוזת צריכה להתחיל ללא רווחים בתחילת שורה
+        card_content = f"""
+<div class='trend-card'>
+<div style='color:#4285F4; font-weight:800; font-size: 0.95rem; margin-bottom:8px;'>#{i+1} במגמות החיפוש</div>
+<a href='{google_search_url}' target='_blank' class='item-title-link'>{search_query}</a>
+<div><span class='traffic-badge'>🔥 {trend['traffic']} חיפושים</span></div>
+<div class='news-box'>
+<div style='font-weight:800; color:#1a1a1a; margin-bottom:18px; font-size:1.2rem;'>למה כולם מחפשים את זה?</div>
+{news_html}
+</div>
+</div>
+"""
+        st.markdown(card_content, unsafe_allow_html=True)
 else:
     st.error("לא ניתן לטעון את המגמות. נסה לרענן.")
