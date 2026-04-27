@@ -7,7 +7,7 @@ import urllib.parse
 # 1. הגדרות דף
 st.set_page_config(page_title="WikiNews Pro Israel", layout="wide", page_icon="🇮🇱")
 
-# CSS חזק - RTL ועיצוב כרטיסים (תיקון מבני למניעת "היעלמות" תוכן)
+# CSS חזק ליישור ימין (RTL) ועיצוב נקי
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap');
@@ -23,7 +23,9 @@ st.markdown("""
         font-size: 3rem;
         font-weight: 800;
         text-align: center !important;
-        margin-bottom: 5px;
+        border-bottom: 4px solid #ee3124;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
     }
 
     .data-status {
@@ -44,122 +46,170 @@ st.markdown("""
         padding: 15px;
         margin-bottom: 30px;
         border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
 
     .trend-tag {
         display: inline-block;
         background-color: #e8f0fe;
         color: #1967d2;
-        padding: 4px 10px;
-        border-radius: 15px;
-        margin: 4px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        margin: 5px;
         font-weight: bold;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
     }
 
-    /* עיצוב הכרטיס */
-    .wiki-card-wrap {
-        border-right: 10px solid #ee3124;
-        background: white;
-        padding: 20px;
+    .wiki-card {
+        background-color: #ffffff;
+        border-right: 12px solid #ee3124;
+        padding: 25px;
+        margin-bottom: 40px;
         border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
 
     .news-item {
-        margin-bottom: 10px;
-        padding: 8px;
+        margin-bottom: 12px;
+        padding: 10px;
         background-color: #f9f9f9;
         border-radius: 5px;
-        border-right: 3px solid #ee3124;
+        border-right: 4px solid #ee3124;
     }
 
     .source-tag {
-        background-color: #ee3124; color: white; padding: 2px 5px;
-        border-radius: 3px; font-size: 0.75rem; font-weight: bold; margin-left: 8px;
+        background-color: #ee3124;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 10px;
+        display: inline-block;
     }
 
-    .item-title { color: #0056b3; font-size: 1.8rem; font-weight: 700; text-decoration: none; }
+    .date-tag {
+        color: #888;
+        font-size: 0.75rem;
+        margin-left: 10px;
+    }
+
+    .item-title {
+        color: #0056b3;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .views-info {
+        color: #666;
+        font-size: 1rem;
+        margin-bottom: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=1800)
 def get_google_trends():
     url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=IL"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.31'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7'
+    }
     try:
         r = requests.get(url, headers=headers, timeout=10)
         root = ET.fromstring(r.content)
-        return [item.find('title').text for item in root.findall('.//item')[:7]]
-    except: return []
+        return [item.find('title').text for item in root.findall('.//item')[:8]]
+    except:
+        return []
 
 @st.cache_data(ttl=3600)
 def fetch_top_articles():
     update_time = datetime.now().strftime('%H:%M')
     for days_back in [1, 2]:
         dt = datetime.now() - timedelta(days=days_back)
-        url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{dt.strftime('%Y/%m/%d')}"
+        date_str = dt.strftime('%Y/%m/%d')
+        display_date = dt.strftime('%d/%m/%Y')
+        url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/he.wikipedia/all-access/{date_str}"
         try:
-            r = requests.get(url, headers={'User-Agent': 'WikiNews/3.0'}, timeout=10)
+            r = requests.get(url, headers={'User-Agent': 'WikiNews/2.5'}, timeout=10)
             if r.status_code == 200:
-                filtered = [a for a in r.json()['items'][0]['articles'] if not any(x in a['article'] for x in ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:"])]
-                return filtered[:20], dt.strftime('%d/%m/%Y'), update_time
+                articles = r.json()['items'][0]['articles']
+                exclude = ["עמוד_ראשי", "ויקיפדיה:", "מיוחד:", "שיחה:", "קובץ:", "משתמש:", "עזרה:", "קטגוריה:", "תבנית:"]
+                filtered = [a for a in articles if not any(word in a['article'] for word in exclude)][:20]
+                return filtered, display_date, update_time
         except: continue
     return [], None, update_time
 
-def get_wiki_meta(title):
-    try:
-        url = f"https://he.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&prop=pageimages|info&format=json&pithumbsize=500"
-        page = list(requests.get(url, timeout=5).json()['query']['pages'].values())[0]
-        return {"image": page.get('thumbnail', {}).get('source', ""), "time": max(1, round(page.get('length', 0) / 1500))}
-    except: return {"image": "", "time": 1}
-
 def get_google_news(query):
-    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=he&gl=IL&ceid=IL:he"
+    encoded = urllib.parse.quote(query.replace('_', ' '))
+    url = f"https://news.google.com/rss/search?q={encoded}&hl=he&gl=IL&ceid=IL:he"
     try:
-        root = ET.fromstring(requests.get(url, timeout=5).content)
-        return [{"title": i.find('title').text.split(" - ")[0], "source": i.find('source').text, "link": i.find('link').text, "date": i.find('pubDate').text[:11]} for i in root.findall('.//item')[:4]]
+        r = requests.get(url, timeout=5)
+        root = ET.fromstring(r.content)
+        news = []
+        for item in root.findall('.//item')[:4]:
+            t = item.find('title').text
+            pub_date = item.find('pubDate').text
+            try:
+                date_str = datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %Z').strftime('%d/%m')
+            except: date_str = ""
+            news.append({
+                "title": t.split(" - ")[0] if " - " in t else t,
+                "source": item.find('source').text if item.find('source') is not None else "חדשות",
+                "link": item.find('link').text,
+                "date": date_str
+            })
+        return news
     except: return []
 
 # --- תצוגה ---
 st.markdown('<h1 class="main-title">WIKI-NEWS ISRAEL</h1>', unsafe_allow_html=True)
 
+# 1. מגמות גוגל טרנדס
 trends = get_google_trends()
 if trends:
     trend_html = "".join([f'<span class="trend-tag">{t}</span>' for t in trends])
-    st.markdown(f'<div class="trends-bar"><strong>🔥 עכשיו בגוגל ישראל:</strong><br>{trend_html}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="trends-bar"><strong>🔥 עכשיו בחיפושים (Google Trends):</strong><br>{trend_html}</div>', unsafe_allow_html=True)
 
+# 2. חיווי נתונים
 top_list, data_date, last_update = fetch_top_articles()
 if data_date:
-    st.markdown(f'<div class="data-status">נתוני ויקיפדיה: {data_date} | עדכון אחרון: {last_update}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="data-status">נתוני ויקיפדיה מיום: {data_date} | עדכון אחרון: {last_update}</div>', unsafe_allow_html=True)
 
+# 3. רשימת הכתבות
 if not top_list:
-    st.error("לא ניתן לטעון נתונים.")
+    st.error("לא ניתן לטעון נתונים. נסה לרענן.")
 else:
     for i, art in enumerate(top_list):
-        title = art['article'].replace('_', ' ')
-        meta = get_wiki_meta(art['article'])
-        news = get_google_news(title)
+        title_clean = art['article'].replace('_', ' ')
+        news = get_google_news(title_clean)
         
-        # שימוש ב-container של Streamlit במקום HTML חיצוני ששובר את התצוגה
-        with st.container():
-            st.markdown(f'<div class="wiki-card-wrap">', unsafe_allow_html=True)
-            col1, col2 = st.columns([1, 2.5])
-            
-            with col1:
-                if meta['image']:
-                    st.image(meta['image'], use_container_width=True)
-                st.write(f"⏱️ כ-{meta['time']} דק' קריאה")
-                st.markdown(f"[🔗 לערך המלא](https://he.wikipedia.org/wiki/{art['article']})")
-            
-            with col2:
-                st.markdown(f'<div style="color:#ee3124; font-weight:bold;">מקום {i+1}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="item-title">{title}</div>', unsafe_allow_html=True)
-                st.write(f"👁️ {art['views']:,} צפיות")
-                st.write("---")
-                if news:
-                    for n in news:
-                        st.markdown(f'<div class="news-item"><span class="source-tag">{n["source"]}</span><a href="{n["link"]}" target="_blank" style="color:#222; text-decoration:none;">{n["title"]}</a></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        # בניית רשימת החדשות לתוך מחרוזת
+        news_html = ""
+        for n in news:
+            news_html += f"""
+            <div class="news-item">
+                <span class="source-tag">{n['source']}</span>
+                <span class="date-tag">{n['date']}</span>
+                <a href="{n['link']}" target="_blank" style="color: #222; font-weight: 500; text-decoration:none;">{n['title']}</a>
+            </div>
+            """
+        
+        if not news_html:
+            news_html = "<p style='color:#999;'>לא נמצאו ידיעות חדשותיות רלוונטיות כרגע.</p>"
+
+        # רינדור הכרטיס המלא
+        st.markdown(f"""
+        <div class="wiki-card">
+            <div style="color:#ee3124; font-weight:bold; font-size: 0.9rem;">מקום {i+1} במדד הפופולריות</div>
+            <div class="item-title"><a href="https://he.wikipedia.org/wiki/{art['article']}" target="_blank" style="color: #0056b3; text-decoration:none;">{title_clean}</a></div>
+            <div class="views-info">👁️ {art["views"]:,} צפיות אתמול</div>
+            <div style="font-weight: bold; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px; color: #444;">למה זה בחדשות?</div>
+            {news_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown("<br><center style='color:#bbb;'>נתונים מוויקיפדיה וחדשות גוגל</center>", unsafe_allow_html=True)
